@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Interval Beeper</title>
+<meta name="apple-mobile-web-app-title" content="Beeper">
+<meta name="theme-color" content="#0C1820">
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAACNElEQVR4nO3csU3DUBRAUYIokz5lJGZgBnpmYKzMQM8MmYEpWICClut8Kd+Kkc6pn+znryvLlXf74+kB/vJ47wXYLnGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEF6WuOi3y/vywOHy3mN+9phrvlvjqsnMjhjh7ubHMf40653LnaYxTcHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHaZX/kN7u+eNzeeDr7dUOa++wxTfH1RMZnLHDjTYXx/jTrncudvi1uTjYDnGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB2lyHIfL+cbJ8f8116QdZpn/5hg5l+WZkaddnrHDFLv98bTe1fnXfHOQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEH6AR0yW/N/qX9aAAAAAElFTkSuQmCC">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #E9ECEF;
+    --panel: #FFFFFF;
+    --ink: #17222B;
+    --dim: #5E6E7B;
+    --hair: #CBD3DA;
+    --single: #0A8FA0;
+    --triple: #C8215A;
+    --future: #B9C3CB;
+    --btn-ink: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0C1820; --panel: #14232E; --ink: #E7EEF3; --dim: #8DA2B0;
+      --hair: #23384A; --single: #2FC6D9; --triple: #FF4D84;
+      --future: #2C4354; --btn-ink: #0C1820;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0C1820; --panel: #14232E; --ink: #E7EEF3; --dim: #8DA2B0;
+    --hair: #23384A; --single: #2FC6D9; --triple: #FF4D84;
+    --future: #2C4354; --btn-ink: #0C1820;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Barlow", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px; line-height: 1.45; min-height: 100dvh;
+    display: flex; justify-content: center;
+    padding: max(12px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom));
+  }
+  .wrap { width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 14px; }
+
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  h1 { font-family: "Barlow Condensed", "Barlow", sans-serif; font-weight: 600; font-size: 22px; margin: 0; }
+  .remaining { font-variant-numeric: tabular-nums; color: var(--dim); font-size: 15px; }
+
+  .stage {
+    background: var(--panel); border: 1px solid var(--hair); border-radius: 14px;
+    padding: 18px 16px 16px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .caption { color: var(--dim); font-size: 14px; }
+  .count {
+    font-family: "Barlow Condensed", "Barlow", sans-serif; font-weight: 600;
+    font-size: clamp(92px, 34vw, 140px); line-height: .92;
+    font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+    transition: color .12s linear;
+  }
+  .count.wide { font-size: clamp(58px, 21vw, 92px); }
+  .count.flash-single { color: var(--single); }
+  .count.flash-triple { color: var(--triple); }
+  .phase { font-size: 15px; color: var(--dim); font-variant-numeric: tabular-nums; min-height: 22px; text-align: center; }
+  .phase b { color: var(--ink); font-weight: 600; }
+
+  .strip { display: flex; align-items: flex-end; gap: 2px; height: 46px; width: 100%; margin-top: 14px; }
+  .bar {
+    flex: 1 1 0; border-radius: 1px; background: var(--future); height: 42%;
+    transition: background-color .15s linear, height .15s linear;
+  }
+  .bar.tri { height: 80%; }
+  .bar.done { background: var(--single); }
+  .bar.tri.done { background: var(--triple); }
+  .bar.now { height: 100%; }
+
+  .controls { display: flex; gap: 10px; }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; border-radius: 11px;
+    padding: 15px 18px; border: 1px solid var(--hair);
+    background: var(--panel); color: var(--ink); touch-action: manipulation;
+  }
+  button:focus-visible { outline: 3px solid var(--single); outline-offset: 2px; }
+  .primary { flex: 2; background: var(--ink); color: var(--btn-ink); border-color: var(--ink); }
+  .ghost { flex: 1; }
+
+  details { background: var(--panel); border: 1px solid var(--hair); border-radius: 14px; padding: 12px 16px; }
+  summary { cursor: pointer; font-weight: 600; font-size: 15px; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; float: right; color: var(--dim); font-weight: 500; }
+  details[open] summary::after { content: "\2013"; }
+  .fields { display: grid; gap: 10px; margin-top: 14px; }
+  .field { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .field label { font-size: 15px; color: var(--dim); flex: 1; }
+  .field input {
+    font: inherit; width: 78px; text-align: right; padding: 9px 10px; border-radius: 9px;
+    border: 1px solid var(--hair); background: var(--bg); color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .field input:disabled { opacity: .5; }
+  .swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 7px; vertical-align: 1px; }
+  .sw-tri { background: var(--triple); }
+  .sw-sgl { background: var(--single); }
+  .aux { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; }
+  .linky { background: none; border: none; padding: 6px 0; color: var(--dim); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+  .note { color: var(--dim); font-size: 13.5px; margin: 0; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Interval Beeper</h1>
+    <div class="remaining" id="remaining">15:00 left</div>
+  </header>
+
+  <section class="stage">
+    <div class="caption" id="caption">Session length</div>
+    <div class="count wide" id="count">15:00</div>
+    <div class="phase" id="phase">Opens with 3 beeps, then 1 beep 30 seconds later</div>
+    <div class="strip" id="strip" aria-hidden="true"></div>
+  </section>
+
+  <div class="controls">
+    <button class="primary" id="startBtn">Start</button>
+    <button class="ghost" id="resetBtn">Reset</button>
+  </div>
+
+  <details id="settings">
+    <summary>Beep pattern</summary>
+    <div class="fields">
+      <div class="field">
+        <label for="dur">Total length, in minutes</label>
+        <input id="dur" type="number" inputmode="numeric" min="1" max="120" step="1" value="15">
+      </div>
+      <div class="field">
+        <label for="iv">Each block lasts, in seconds</label>
+        <input id="iv" type="number" inputmode="numeric" min="3" max="600" step="1" value="30">
+      </div>
+      <div class="field">
+        <label for="ab"><span class="swatch sw-tri"></span>Beeps opening the cycle</label>
+        <input id="ab" type="number" inputmode="numeric" min="1" max="6" step="1" value="3">
+      </div>
+      <div class="field">
+        <label for="nb"><span class="swatch sw-sgl"></span>Beeps opening later blocks</label>
+        <input id="nb" type="number" inputmode="numeric" min="1" max="6" step="1" value="1">
+      </div>
+      <div class="field">
+        <label for="cyc">Blocks per cycle</label>
+        <input id="cyc" type="number" inputmode="numeric" min="2" max="12" step="1" value="2">
+      </div>
+    </div>
+    <div class="aux">
+      <button class="linky" id="testBtn">Hear both signals</button>
+      <button class="linky" id="defBtn">Back to defaults</button>
+    </div>
+  </details>
+
+  <p class="note" id="note">Turn the ringer on, turn media volume up, and leave this screen open. The screen stays awake while the timer runs.</p>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var DEFAULTS = { dur: 15, iv: 30, ab: 3, nb: 1, cyc: 2 };
+  var cfg = { dur: 15, iv: 30, ab: 3, nb: 1, cyc: 2 };
+  var LS = "intervalBeeper.v2";
+
+  var el = {};
+  ["count","caption","phase","remaining","strip","note","dur","iv","ab","nb","cyc"].forEach(function (id) {
+    el[id] = document.getElementById(id);
+  });
+  el.start = document.getElementById("startBtn");
+  el.reset = document.getElementById("resetBtn");
+  el.test = document.getElementById("testBtn");
+  el.defaults = document.getElementById("defBtn");
+
+  var ctx = null, sources = [], wakeLock = null;
+  var running = false, finished = false;
+  var elapsed = 0, baseElapsed = 0, startPerf = 0;
+  var bars = [], fired = 0;
+
+  function totalSeconds() { return cfg.dur * 60; }
+  function blockCount() { return Math.max(1, Math.round(totalSeconds() / cfg.iv)); }
+  function isTriple(i) { return i % cfg.cyc === 0; }   /* i is 0-based block index */
+
+  /* ---------- settings ---------- */
+
+  function loadSettings() {
+    try {
+      var raw = localStorage.getItem(LS);
+      if (raw) {
+        var s = JSON.parse(raw);
+        for (var k in cfg) if (typeof s[k] === "number" && isFinite(s[k])) cfg[k] = s[k];
+      }
+    } catch (e) { /* storage unavailable; defaults are fine */ }
+    writeFields();
+  }
+  function saveSettings() { try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch (e) {} }
+  function writeFields() {
+    el.dur.value = cfg.dur; el.iv.value = cfg.iv;
+    el.ab.value = cfg.ab; el.nb.value = cfg.nb; el.cyc.value = cfg.cyc;
+  }
+  function clamp(v, lo, hi, fb) {
+    v = parseInt(v, 10);
+    if (!isFinite(v)) return fb;
+    return Math.min(hi, Math.max(lo, v));
+  }
+  function readSettings() {
+    cfg.dur = clamp(el.dur.value, 1, 120, DEFAULTS.dur);
+    cfg.iv  = clamp(el.iv.value, 3, 600, DEFAULTS.iv);
+    cfg.ab  = clamp(el.ab.value, 1, 6, DEFAULTS.ab);
+    cfg.nb  = clamp(el.nb.value, 1, 6, DEFAULTS.nb);
+    cfg.cyc = clamp(el.cyc.value, 2, 12, DEFAULTS.cyc);
+    writeFields(); saveSettings(); buildStrip(); render();
+  }
+  ["dur","iv","ab","nb","cyc"].forEach(function (k) {
+    el[k].addEventListener("change", function () { if (!running) { hardReset(); readSettings(); } });
+  });
+  el.defaults.addEventListener("click", function () {
+    for (var k in DEFAULTS) cfg[k] = DEFAULTS[k];
+    writeFields(); hardReset(); readSettings();
+  });
+  function lockFields(lock) {
+    ["dur","iv","ab","nb","cyc"].forEach(function (k) { el[k].disabled = lock; });
+  }
+
+  /* ---------- audio ---------- */
+
+  function audio() {
+    if (!ctx) { var AC = window.AudioContext || window.webkitAudioContext; ctx = new AC(); }
+    if (ctx.state === "suspended") ctx.resume();
+    return ctx;
+  }
+  function tone(when, freq, dur, vol) {
+    var c = audio(), osc = c.createOscillator(), g = c.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, when);
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vol, when + 0.012);
+    g.gain.setValueAtTime(vol, when + Math.max(0.03, dur - 0.05));
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    osc.connect(g); g.connect(c.destination);
+    osc.start(when); osc.stop(when + dur + 0.02);
+    sources.push(osc);
+  }
+  function beepGroup(when, triple) {
+    var n = triple ? cfg.ab : cfg.nb;
+    var freq = triple ? 988 : 622;
+    var len = triple ? 0.13 : 0.40;
+    var gap = triple ? 0.22 : 0.50;
+    for (var i = 0; i < n; i++) tone(when + i * gap, freq, len, 0.32);
+  }
+  function endSignal(when) {
+    tone(when, 784, 0.18, 0.3);
+    tone(when + 0.24, 659, 0.18, 0.3);
+    tone(when + 0.48, 523, 0.75, 0.32);
+  }
+  function clearAudio() {
+    sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
+    sources = [];
+  }
+  function scheduleFrom(fromSec) {
+    var c = audio(), t0 = c.currentTime + 0.12;
+    var total = totalSeconds(), n = blockCount();
+    for (var i = 0; i < n; i++) {
+      var at = i * cfg.iv;
+      if (at < fromSec - 0.001 || fired > i) continue;
+      beepGroup(t0 + (at - fromSec), isTriple(i));
+    }
+    if (total > fromSec + 0.03) endSignal(t0 + (total - fromSec));
+  }
+
+  /* ---------- screen wake ---------- */
+
+  function requestWake() {
+    if (!("wakeLock" in navigator)) return;
+    navigator.wakeLock.request("screen").then(function (w) {
+      wakeLock = w;
+      w.addEventListener("release", function () { wakeLock = null; });
+    })["catch"](function () {});
+  }
+  function releaseWake() {
+    if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") {
+      if (ctx && ctx.state === "suspended") ctx.resume();
+      if (running) requestWake();
+    }
+  });
+
+  /* ---------- strip ---------- */
+
+  function buildStrip() {
+    el.strip.innerHTML = ""; bars = [];
+    var n = blockCount();
+    for (var i = 0; i < n; i++) {
+      var b = document.createElement("div");
+      b.className = "bar" + (isTriple(i) ? " tri" : "");
+      el.strip.appendChild(b); bars.push(b);
+    }
+  }
+
+  /* ---------- display ---------- */
+
+  function mmss(s) {
+    s = Math.max(0, Math.ceil(s));
+    var m = Math.floor(s / 60), r = s % 60;
+    return m + ":" + (r < 10 ? "0" : "") + r;
+  }
+  function flash(triple) {
+    el.count.classList.add(triple ? "flash-triple" : "flash-single");
+    setTimeout(function () { el.count.classList.remove("flash-triple", "flash-single"); }, 450);
+  }
+  function words(n) { return n === 1 ? "1 beep" : n + " beeps"; }
+
+  function render() {
+    var total = totalSeconds(), n = blockCount();
+    var idle = !running && !finished && elapsed === 0;
+    var done = running || finished ? Math.min(n, Math.floor(elapsed / cfg.iv + 1e-6) + 1) : Math.min(n, Math.ceil(elapsed / cfg.iv));
+    if (finished) done = n;
+    var nextIdx = Math.min(n - 1, done);
+    var toNext = done >= n ? total - elapsed : done * cfg.iv - elapsed;
+
+    el.count.classList.toggle("wide", idle || finished);
+
+    if (idle) {
+      el.count.textContent = mmss(total);
+      el.caption.textContent = "Session length";
+      el.phase.innerHTML = "Opens with " + words(cfg.ab) + ", then " + words(cfg.nb) + " " + cfg.iv + " seconds later";
+      el.remaining.textContent = mmss(total) + " left";
+    } else if (finished) {
+      el.count.textContent = mmss(total);
+      el.caption.textContent = "Done";
+      el.phase.innerHTML = "Finished <b>" + n + "</b> blocks";
+      el.remaining.textContent = "0:00 left";
+    } else {
+      el.count.textContent = String(Math.max(0, Math.ceil(toNext)));
+      el.caption.textContent = running
+        ? (done >= n ? "Finish in" : "Next signal in")
+        : "Paused";
+      if (done >= n) {
+        el.phase.innerHTML = "Final block, <b>" + n + "</b> of " + n;
+      } else {
+        el.phase.innerHTML = "Block <b>" + done + "</b> of " + n + ", next is " + words(isTriple(nextIdx) ? cfg.ab : cfg.nb);
+      }
+      el.remaining.textContent = mmss(total - elapsed) + " left";
+    }
+
+    for (var i = 0; i < bars.length; i++) {
+      bars[i].classList.toggle("done", i < done);
+      bars[i].classList.toggle("now", !finished && i === done - 1);
+    }
+
+    if (done > fired) { flash(isTriple(done - 1)); fired = done; }
+  }
+
+  function loop() {
+    if (running) {
+      elapsed = baseElapsed + (performance.now() - startPerf) / 1000;
+      if (elapsed >= totalSeconds()) { elapsed = totalSeconds(); finish(); }
+      render();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  /* ---------- transport ---------- */
+
+  function start() {
+    if (finished) hardReset();
+    readSettings();
+    audio(); clearAudio();
+    scheduleFrom(elapsed);
+    baseElapsed = elapsed;
+    startPerf = performance.now();
+    running = true;
+    lockFields(true);
+    el.start.textContent = "Pause";
+    requestWake();
+    render();
+  }
+  function pause() {
+    running = false;
+    elapsed = baseElapsed + (performance.now() - startPerf) / 1000;
+    baseElapsed = elapsed;
+    clearAudio(); releaseWake(); lockFields(false);
+    el.start.textContent = "Resume";
+    render();
+  }
+  function finish() {
+    running = false; finished = true;
+    releaseWake(); lockFields(false);
+    el.start.textContent = "Start again";
+    fired = blockCount();
+  }
+  function hardReset() {
+    running = false; finished = false;
+    elapsed = 0; baseElapsed = 0; fired = 0;
+    clearAudio(); releaseWake(); lockFields(false);
+    el.start.textContent = "Start";
+    render();
+  }
+
+  el.start.addEventListener("click", function () { running ? pause() : start(); });
+  el.reset.addEventListener("click", hardReset);
+  el.test.addEventListener("click", function () {
+    var c = audio();
+    beepGroup(c.currentTime + 0.05, true);
+    beepGroup(c.currentTime + 1.8, false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.code === "Space" && e.target.tagName !== "INPUT") { e.preventDefault(); running ? pause() : start(); }
+  });
+
+  if (!("wakeLock" in navigator)) {
+    el.note.textContent = "Turn the ringer on, turn media volume up, and keep this screen on. This browser can't hold the screen awake on its own.";
+  }
+
+  loadSettings(); buildStrip(); render(); loop();
+})();
+</script>
+</body>
+</html>
