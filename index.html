@@ -141,8 +141,12 @@
         <input id="dur" type="number" inputmode="numeric" min="1" max="120" step="1" value="15">
       </div>
       <div class="field">
-        <label for="iv">Each block lasts, in seconds</label>
-        <input id="iv" type="number" inputmode="numeric" min="3" max="600" step="1" value="30">
+        <label for="ion"><span class="swatch sw-tri"></span>"On" block, in seconds</label>
+        <input id="ion" type="number" inputmode="numeric" min="3" max="600" step="1" value="30">
+      </div>
+      <div class="field">
+        <label for="ioff"><span class="swatch sw-sgl"></span>"Off" blocks, in seconds</label>
+        <input id="ioff" type="number" inputmode="numeric" min="3" max="600" step="1" value="30">
       </div>
       <div class="field">
         <label for="ab"><span class="swatch sw-tri"></span>Beeps opening the cycle</label>
@@ -151,6 +155,10 @@
       <div class="field">
         <label for="nb"><span class="swatch sw-sgl"></span>Beeps opening later blocks</label>
         <input id="nb" type="number" inputmode="numeric" min="1" max="6" step="1" value="1">
+      </div>
+      <div class="field">
+        <label for="pat">Custom sequence, seconds</label>
+        <input id="pat" type="text" inputmode="numeric" placeholder="e.g. 60, 30, 45" value="">
       </div>
       <div class="field">
         <label for="cyc">Blocks per cycle</label>
@@ -171,12 +179,12 @@
 (function () {
   "use strict";
 
-  var DEFAULTS = { dur: 15, iv: 30, ab: 3, nb: 1, cyc: 2 };
-  var cfg = { dur: 15, iv: 30, ab: 3, nb: 1, cyc: 2 };
-  var LS = "intervalBeeper.v2";
+  var DEFAULTS = { dur: 15, ion: 30, ioff: 30, ab: 3, nb: 1, cyc: 2, pat: "" };
+  var cfg = { dur: 15, ion: 30, ioff: 30, ab: 3, nb: 1, cyc: 2, pat: "" };
+  var LS = "intervalBeeper.v2";  /* ion/ioff added; old iv migrated on load */
 
   var el = {};
-  ["count","caption","phase","remaining","strip","note","dur","iv","ab","nb","cyc"].forEach(function (id) {
+  ["count","caption","phase","remaining","strip","note","dur","ion","ioff","ab","nb","cyc","pat"].forEach(function (id) {
     el[id] = document.getElementById(id);
   });
   el.start = document.getElementById("startBtn");
@@ -190,8 +198,31 @@
   var bars = [], fired = 0;
 
   function totalSeconds() { return cfg.dur * 60; }
-  function blockCount() { return Math.max(1, Math.round(totalSeconds() / cfg.iv)); }
-  function isTriple(i) { return i % cfg.cyc === 0; }   /* i is 0-based block index */
+  var pattern = [];   /* parsed custom sequence; empty means use on/off */
+  function parsePattern(str) {
+    var out = [];
+    String(str || "").split(/[,\s;]+/).forEach(function (t) {
+      if (!t) return;
+      var v = parseFloat(t);
+      if (isFinite(v) && v >= 1) out.push(Math.min(3600, Math.round(v)));
+    });
+    return out.slice(0, 60);
+  }
+  function cycleLen() { return pattern.length ? pattern.length : cfg.cyc; }
+  function isTriple(i) { return i % cycleLen() === 0; }   /* i is 0-based block index */
+  function blockLen(i) {
+    if (pattern.length) return pattern[i % pattern.length];
+    return isTriple(i) ? cfg.ion : cfg.ioff;
+  }
+  var starts = [0];
+  function computeStarts() {
+    var total = totalSeconds(), t = 0, i = 0;
+    starts = [];
+    while (t < total - 0.001) { starts.push(t); t += blockLen(i); i++; }
+    if (!starts.length) starts = [0];
+  }
+  function blockCount() { return starts.length; }
+  function blockEnd(i) { return Math.min(totalSeconds(), starts[i] + blockLen(i)); }
 
   /* ---------- settings ---------- */
 
@@ -201,14 +232,20 @@
       if (raw) {
         var s = JSON.parse(raw);
         for (var k in cfg) if (typeof s[k] === "number" && isFinite(s[k])) cfg[k] = s[k];
+        if (typeof s.iv === "number" && s.ion === undefined) { cfg.ion = s.iv; cfg.ioff = s.iv; }
+        if (typeof s.pat === "string") cfg.pat = s.pat;
       }
     } catch (e) { /* storage unavailable; defaults are fine */ }
+    pattern = parsePattern(cfg.pat);
     writeFields();
   }
   function saveSettings() { try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch (e) {} }
   function writeFields() {
-    el.dur.value = cfg.dur; el.iv.value = cfg.iv;
+    el.dur.value = cfg.dur; el.ion.value = cfg.ion; el.ioff.value = cfg.ioff;
     el.ab.value = cfg.ab; el.nb.value = cfg.nb; el.cyc.value = cfg.cyc;
+    el.pat.value = cfg.pat;
+    var custom = pattern.length > 0;
+    el.ion.disabled = custom; el.ioff.disabled = custom; el.cyc.disabled = custom;
   }
   function clamp(v, lo, hi, fb) {
     v = parseInt(v, 10);
@@ -217,21 +254,25 @@
   }
   function readSettings() {
     cfg.dur = clamp(el.dur.value, 1, 120, DEFAULTS.dur);
-    cfg.iv  = clamp(el.iv.value, 3, 600, DEFAULTS.iv);
+    cfg.ion  = clamp(el.ion.value, 3, 600, DEFAULTS.ion);
+    cfg.ioff = clamp(el.ioff.value, 3, 600, DEFAULTS.ioff);
     cfg.ab  = clamp(el.ab.value, 1, 6, DEFAULTS.ab);
     cfg.nb  = clamp(el.nb.value, 1, 6, DEFAULTS.nb);
     cfg.cyc = clamp(el.cyc.value, 2, 12, DEFAULTS.cyc);
-    writeFields(); saveSettings(); buildStrip(); render();
+    pattern = parsePattern(el.pat.value);
+    cfg.pat = pattern.length ? pattern.join(", ") : "";
+    writeFields(); saveSettings(); computeStarts(); buildStrip(); render();
   }
-  ["dur","iv","ab","nb","cyc"].forEach(function (k) {
+  ["dur","ion","ioff","ab","nb","cyc","pat"].forEach(function (k) {
     el[k].addEventListener("change", function () { if (!running) { hardReset(); readSettings(); } });
   });
   el.defaults.addEventListener("click", function () {
     for (var k in DEFAULTS) cfg[k] = DEFAULTS[k];
+    pattern = []; el.pat.value = "";
     writeFields(); hardReset(); readSettings();
   });
   function lockFields(lock) {
-    ["dur","iv","ab","nb","cyc"].forEach(function (k) { el[k].disabled = lock; });
+    ["dur","ion","ioff","ab","nb","cyc","pat"].forEach(function (k) { el[k].disabled = lock; });
   }
 
   /* ---------- audio ---------- */
@@ -273,7 +314,7 @@
     var c = audio(), t0 = c.currentTime + 0.12;
     var total = totalSeconds(), n = blockCount();
     for (var i = 0; i < n; i++) {
-      var at = i * cfg.iv;
+      var at = starts[i];
       if (at < fromSec - 0.001 || fired > i) continue;
       beepGroup(t0 + (at - fromSec), isTriple(i));
     }
@@ -307,6 +348,7 @@
     for (var i = 0; i < n; i++) {
       var b = document.createElement("div");
       b.className = "bar" + (isTriple(i) ? " tri" : "");
+      b.style.flex = (blockEnd(i) - starts[i]) + " 1 0";
       el.strip.appendChild(b); bars.push(b);
     }
   }
@@ -327,17 +369,20 @@
   function render() {
     var total = totalSeconds(), n = blockCount();
     var idle = !running && !finished && elapsed === 0;
-    var done = running || finished ? Math.min(n, Math.floor(elapsed / cfg.iv + 1e-6) + 1) : Math.min(n, Math.ceil(elapsed / cfg.iv));
+    var done = 0;
+    for (var j = 0; j < n; j++) {
+      if (running ? starts[j] <= elapsed + 1e-6 : starts[j] < elapsed - 1e-6) done++;
+    }
     if (finished) done = n;
     var nextIdx = Math.min(n - 1, done);
-    var toNext = done >= n ? total - elapsed : done * cfg.iv - elapsed;
+    var toNext = done >= n ? total - elapsed : starts[done] - elapsed;
 
     el.count.classList.toggle("wide", idle || finished);
 
     if (idle) {
       el.count.textContent = mmss(total);
       el.caption.textContent = "Session length";
-      el.phase.innerHTML = "Opens with " + words(cfg.ab) + ", then " + words(cfg.nb) + " " + cfg.iv + " seconds later";
+      el.phase.innerHTML = "Opens with " + words(cfg.ab) + ", then " + words(cfg.nb) + " " + blockLen(0) + " seconds later" + (pattern.length ? ", repeating " + pattern.join("/") + "s" : (cfg.ion !== cfg.ioff ? ", off blocks " + cfg.ioff + "s" : ""));
       el.remaining.textContent = mmss(total) + " left";
     } else if (finished) {
       el.count.textContent = mmss(total);
@@ -426,7 +471,7 @@
     el.note.textContent = "Turn the ringer on, turn media volume up, and keep this screen on. This browser can't hold the screen awake on its own.";
   }
 
-  loadSettings(); buildStrip(); render(); loop();
+  loadSettings(); computeStarts(); buildStrip(); render(); loop();
 })();
 </script>
 </body>
