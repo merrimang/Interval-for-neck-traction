@@ -107,9 +107,18 @@
   .swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 7px; vertical-align: 1px; }
   .sw-tri { background: var(--triple); }
   .sw-sgl { background: var(--single); }
-  .aux { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; }
+  .aux { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 14px; margin-top: 14px; }
   .linky { background: none; border: none; padding: 6px 0; color: var(--dim); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
   .note { color: var(--dim); font-size: 13.5px; margin: 0; }
+  .presets { display: flex; gap: 8px; overflow-x: auto; padding: 2px 1px 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .presets::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto; padding: 9px 14px; border-radius: 999px; font-size: 14.5px; font-weight: 600;
+    background: var(--panel); color: var(--dim); border: 1px solid var(--hair); white-space: nowrap;
+  }
+  .chip.on { background: var(--ink); color: var(--btn-ink); border-color: var(--ink); }
+  .chip:disabled { opacity: .5; }
+  .chip.add { color: var(--dim); font-weight: 500; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -127,6 +136,8 @@
     <div class="phase" id="phase">Opens with 3 beeps, then 1 beep 30 seconds later</div>
     <div class="strip" id="strip" aria-hidden="true"></div>
   </section>
+
+  <div class="presets" id="presets" role="group" aria-label="Saved routines"></div>
 
   <div class="controls">
     <button class="primary" id="startBtn">Start</button>
@@ -167,7 +178,9 @@
     </div>
     <div class="aux">
       <button class="linky" id="testBtn">Hear both signals</button>
-      <button class="linky" id="defBtn">Back to defaults</button>
+      <button class="linky" id="saveBtn">Save as routine</button>
+      <button class="linky" id="delBtn">Delete routine</button>
+      <button class="linky" id="defBtn">Defaults</button>
     </div>
   </details>
 
@@ -191,6 +204,9 @@
   el.reset = document.getElementById("resetBtn");
   el.test = document.getElementById("testBtn");
   el.defaults = document.getElementById("defBtn");
+  el.presets = document.getElementById("presets");
+  el.save = document.getElementById("saveBtn");
+  el.del = document.getElementById("delBtn");
 
   var ctx = null, sources = [], wakeLock = null;
   var running = false, finished = false;
@@ -252,7 +268,7 @@
     if (!isFinite(v)) return fb;
     return Math.min(hi, Math.max(lo, v));
   }
-  function readSettings() {
+  function readSettings(fromPreset) {
     cfg.dur = clamp(el.dur.value, 1, 120, DEFAULTS.dur);
     cfg.ion  = clamp(el.ion.value, 3, 600, DEFAULTS.ion);
     cfg.ioff = clamp(el.ioff.value, 3, 600, DEFAULTS.ioff);
@@ -262,6 +278,11 @@
     pattern = parsePattern(el.pat.value);
     cfg.pat = pattern.length ? pattern.join(", ") : "";
     writeFields(); saveSettings(); computeStarts(); buildStrip(); render();
+    if (!fromPreset && activePreset) {
+      var i = findPreset(activePreset);
+      if (i < 0 || JSON.stringify(presets[i].cfg) !== JSON.stringify(snapshot())) { activePreset = null; savePresets(); }
+    }
+    if (el.presets) renderPresets();
   }
   ["dur","ion","ioff","ab","nb","cyc","pat"].forEach(function (k) {
     el[k].addEventListener("change", function () { if (!running) { hardReset(); readSettings(); } });
@@ -269,11 +290,69 @@
   el.defaults.addEventListener("click", function () {
     for (var k in DEFAULTS) cfg[k] = DEFAULTS[k];
     pattern = []; el.pat.value = "";
+    activePreset = null; savePresets();
     writeFields(); hardReset(); readSettings();
   });
   function lockFields(lock) {
     ["dur","ion","ioff","ab","nb","cyc","pat"].forEach(function (k) { el[k].disabled = lock; });
+    if (!lock) { var custom = parsePattern(el.pat.value).length > 0; el.ion.disabled = custom; el.ioff.disabled = custom; el.cyc.disabled = custom; }
+    renderPresets();
   }
+
+  /* ---------- saved routines ---------- */
+
+  var LSP = "intervalBeeper.presets";
+  var presets = [], activePreset = null;
+  function snapshot() { var o = {}; for (var k in DEFAULTS) o[k] = cfg[k]; return o; }
+  function loadPresets() {
+    try {
+      var raw = localStorage.getItem(LSP);
+      if (raw) { var d = JSON.parse(raw); presets = Array.isArray(d.list) ? d.list : []; activePreset = d.active || null; }
+    } catch (e) {}
+    if (!presets.length) { presets = [{ name: "Neck traction", cfg: snapshot() }]; activePreset = "Neck traction"; savePresets(); }
+  }
+  function savePresets() { try { localStorage.setItem(LSP, JSON.stringify({ list: presets, active: activePreset })); } catch (e) {} }
+  function findPreset(name) { for (var i = 0; i < presets.length; i++) if (presets[i].name === name) return i; return -1; }
+  function applyPreset(name) {
+    var i = findPreset(name); if (i < 0) return;
+    var p = presets[i].cfg;
+    for (var k in DEFAULTS) if (p[k] !== undefined) cfg[k] = p[k];
+    pattern = parsePattern(cfg.pat);
+    activePreset = name; savePresets();
+    writeFields(); hardReset(); readSettings(true);
+  }
+  function renderPresets() {
+    el.presets.innerHTML = "";
+    presets.forEach(function (p) {
+      var b = document.createElement("button");
+      b.className = "chip" + (p.name === activePreset ? " on" : "");
+      b.textContent = p.name; b.disabled = running;
+      b.setAttribute("aria-pressed", p.name === activePreset ? "true" : "false");
+      b.addEventListener("click", function () { if (!running) applyPreset(p.name); });
+      el.presets.appendChild(b);
+    });
+    var add = document.createElement("button");
+    add.className = "chip add"; add.textContent = "+ New"; add.disabled = running;
+    add.addEventListener("click", function () { if (!running) { document.getElementById("settings").open = true; saveAsRoutine(); } });
+    el.presets.appendChild(add);
+    el.del.disabled = !activePreset || running;
+  }
+  function saveAsRoutine() {
+    var name = window.prompt("Name this routine (uses the current pattern settings):", activePreset || "");
+    if (name === null) return;
+    name = name.trim().slice(0, 30);
+    if (!name) return;
+    var i = findPreset(name), entry = { name: name, cfg: snapshot() };
+    if (i >= 0) presets[i] = entry; else presets.push(entry);
+    activePreset = name; savePresets(); renderPresets();
+  }
+  el.save.addEventListener("click", function () { if (!running) saveAsRoutine(); });
+  el.del.addEventListener("click", function () {
+    if (running || !activePreset) return;
+    if (!window.confirm("Delete the routine \u201c" + activePreset + "\u201d?")) return;
+    var i = findPreset(activePreset); if (i >= 0) presets.splice(i, 1);
+    activePreset = null; savePresets(); renderPresets();
+  });
 
   /* ---------- audio ---------- */
 
@@ -471,7 +550,7 @@
     el.note.textContent = "Turn the ringer on, turn media volume up, and keep this screen on. This browser can't hold the screen awake on its own.";
   }
 
-  loadSettings(); computeStarts(); buildStrip(); render(); loop();
+  loadSettings(); loadPresets(); computeStarts(); buildStrip(); render(); renderPresets(); loop();
 })();
 </script>
 </body>
